@@ -3,7 +3,11 @@
     "builds": [
         {
             "src": "app.py",
-            "use": "@vercel/python"
+            "use": "@vercel/python",
+            "config": {
+                "maxLambdaSize": "50mb",
+                "runtime": "python3.9"
+            }
         },
         {
             "src": "templates/**",
@@ -21,6 +25,7 @@
         }
     ],
     "env": {
-        "PYTHONPATH": "."
+        "PYTHONPATH": ".",
+        "PYTHONUNBUFFERED": "1"
     }
 } 

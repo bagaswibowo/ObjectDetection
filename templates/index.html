@@ -6,6 +6,7 @@
     <title>Object Detection CCTV</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         body {
             background-color: #f8f9fa;
@@ -71,9 +72,19 @@
         .btn-custom {
             min-width: 120px;
         }
-        #videoElement {
-            width: 100%;
-            height: auto;
+        .stats-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .history-container {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .filter-container {
+            margin-bottom: 20px;
         }
     </style>
 </head>
@@ -112,43 +123,133 @@
             </div>
         </div>
 
-        <div class="video-container">
-            <div class="loading-overlay" id="loadingOverlay">
-                <div class="text-center">
-                    <div class="spinner-border text-light mb-2" role="status"></div>
-                    <div>Memuat stream...</div>
+        <div class="row">
+            <div class="col-md-8">
+                <div class="video-container">
+                    <div class="loading-overlay" id="loadingOverlay">
+                        <div class="text-center">
+                            <div class="spinner-border text-light mb-2" role="status"></div>
+                            <div>Memuat stream...</div>
+                        </div>
+                    </div>
+                    <img src="{{ url_for('video_feed') }}" class="video-feed" id="videoFeed" alt="Video Feed CCTV">
                 </div>
             </div>
-            <video id="videoElement" autoplay></video>
+            <div class="col-md-4">
+                <div class="detection-info">
+                    <h4><i class="fas fa-info-circle"></i> Informasi Deteksi</h4>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Objek Terdeteksi:</h5>
+                            <div id="objectCounts">
+                                <p><i class="fas fa-user"></i> Orang: <span id="count-person">0</span></p>
+                                <p><i class="fas fa-car"></i> Mobil: <span id="count-car">0</span></p>
+                                <p><i class="fas fa-motorcycle"></i> Motor: <span id="count-motorcycle">0</span></p>
+                                <p><i class="fas fa-bicycle"></i> Sepeda: <span id="count-bicycle">0</span></p>
+                                <p><i class="fas fa-truck"></i> Truk: <span id="count-truck">0</span></p>
+                                <p><i class="fas fa-bus"></i> Bus: <span id="count-bus">0</span></p>
+                                <p><i class="fas fa-cat"></i> Kucing: <span id="count-cat">0</span></p>
+                                <p><i class="fas fa-dog"></i> Anjing: <span id="count-dog">0</span></p>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Status:</h5>
+                            <p><strong>Status Deteksi:</strong> <span id="detectionStatus">Tidak Aktif</span></p>
+                            <p><strong>Total Objek:</strong> <span id="totalObjects">0</span></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="detection-info">
-            <h4><i class="fas fa-info-circle"></i> Informasi Deteksi</h4>
+        <div class="stats-container">
+            <h4><i class="fas fa-chart-pie"></i> Ringkasan Objek Terdeteksi</h4>
             <div class="row">
                 <div class="col-md-6">
-                    <h5>Objek Terdeteksi:</h5>
-                    <div id="objectCounts">
-                        <p><i class="fas fa-user"></i> Orang: <span id="count-person">0</span></p>
-                        <p><i class="fas fa-car"></i> Mobil: <span id="count-car">0</span></p>
-                        <p><i class="fas fa-motorcycle"></i> Motor: <span id="count-motorcycle">0</span></p>
-                        <p><i class="fas fa-bicycle"></i> Sepeda: <span id="count-bicycle">0</span></p>
-                        <p><i class="fas fa-truck"></i> Truk: <span id="count-truck">0</span></p>
-                        <p><i class="fas fa-bus"></i> Bus: <span id="count-bus">0</span></p>
-                        <p><i class="fas fa-cat"></i> Kucing: <span id="count-cat">0</span></p>
-                        <p><i class="fas fa-dog"></i> Anjing: <span id="count-dog">0</span></p>
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th>Jenis Objek</th>
+                                    <th>Total</th>
+                                    <th>Persentase</th>
+                                </tr>
+                            </thead>
+                            <tbody id="objectSummary">
+                                <!-- Ringkasan akan diisi secara dinamis -->
+                            </tbody>
+                            <tfoot class="table-secondary">
+                                <tr>
+                                    <th>Total Keseluruhan</th>
+                                    <th colspan="2" id="totalAll">0</th>
+                                </tr>
+                            </tfoot>
+                        </table>
                     </div>
                 </div>
                 <div class="col-md-6">
-                    <h5>Status:</h5>
-                    <p><strong>Status Deteksi:</strong> <span id="detectionStatus">Tidak Aktif</span></p>
-                    <p><strong>Total Objek:</strong> <span id="totalObjects">0</span></p>
+                    <div id="summaryPieChart"></div>
                 </div>
+            </div>
+        </div>
+
+        <div class="stats-container">
+            <h4><i class="fas fa-chart-line"></i> Statistik Deteksi</h4>
+            <div class="filter-container">
+                <select class="form-select" id="objectFilter" aria-label="Filter objek">
+                    <option value="all">Semua Objek</option>
+                    <option value="Orang">Orang</option>
+                    <option value="mobil">Mobil</option>
+                    <option value="motor">Motor</option>
+                    <option value="sepeda">Sepeda</option>
+                    <option value="truk">Truk</option>
+                    <option value="bus">Bus</option>
+                    <option value="Kucing">Kucing</option>
+                    <option value="Anjing">Anjing</option>
+                </select>
+            </div>
+            <div class="row">
+                <div class="col-md-8">
+                    <div id="statisticsChart"></div>
+                </div>
+                <div class="col-md-4">
+                    <div id="pieChart"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-container">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4><i class="fas fa-history"></i> Riwayat Deteksi</h4>
+                <button class="btn btn-success" id="exportBtn">
+                    <i class="fas fa-file-excel"></i> Export Data
+                </button>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Waktu</th>
+                            <th>Orang</th>
+                            <th>Mobil</th>
+                            <th>Motor</th>
+                            <th>Sepeda</th>
+                            <th>Truk</th>
+                            <th>Bus</th>
+                            <th>Kucing</th>
+                            <th>Anjing</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="detectionHistory">
+                        <!-- Riwayat akan diisi secara dinamis -->
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
     <script>
         const startBtn = document.getElementById('startBtn');
         const stopBtn = document.getElementById('stopBtn');
@@ -156,68 +257,13 @@
         const statusIndicator = document.getElementById('statusIndicator');
         const statusText = document.getElementById('statusText');
         const loadingOverlay = document.getElementById('loadingOverlay');
-        const videoElement = document.getElementById('videoElement');
+        const detectedObjects = document.getElementById('detectedObjects');
         const detectionStatus = document.getElementById('detectionStatus');
-        
-        let hls = null;
-        let isProcessing = false;
-        let processingInterval = null;
 
         function updateStatus(active) {
             statusIndicator.className = `status-indicator ${active ? 'status-active' : 'status-inactive'}`;
             statusText.textContent = `Status: ${active ? 'Aktif' : 'Tidak Aktif'}`;
             detectionStatus.textContent = active ? 'Aktif' : 'Tidak Aktif';
-        }
-
-        async function processFrame() {
-            if (!isProcessing) return;
-
-            try {
-                const canvas = document.createElement('canvas');
-                canvas.width = videoElement.videoWidth;
-                canvas.height = videoElement.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(videoElement, 0, 0);
-
-                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
-                const formData = new FormData();
-                formData.append('frame', blob);
-
-                const response = await fetch('/process_frame', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-                
-                if (data.error) {
-                    console.error('Error:', data.error);
-                    return;
-                }
-
-                // Update video element with processed frame
-                const img = new Image();
-                img.onload = () => {
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0);
-                };
-                img.src = 'data:image/jpeg;base64,' + data.frame;
-
-                // Update object counts
-                const objects = data.objects;
-                document.getElementById('count-person').textContent = objects['Orang'] || 0;
-                document.getElementById('count-car').textContent = objects['mobil'] || 0;
-                document.getElementById('count-motorcycle').textContent = objects['motor'] || 0;
-                document.getElementById('count-bicycle').textContent = objects['sepeda'] || 0;
-                document.getElementById('count-truck').textContent = objects['truk'] || 0;
-                document.getElementById('count-bus').textContent = objects['bus'] || 0;
-                document.getElementById('count-cat').textContent = objects['Kucing'] || 0;
-                document.getElementById('count-dog').textContent = objects['Anjing'] || 0;
-                document.getElementById('totalObjects').textContent = data.total;
-
-            } catch (error) {
-                console.error('Error processing frame:', error);
-            }
         }
 
         startBtn.addEventListener('click', function() {
@@ -228,80 +274,204 @@
             }
 
             loadingOverlay.style.display = 'flex';
-            
-            if (Hls.isSupported()) {
-                if (hls) {
-                    hls.destroy();
+            updateStatus(true);
+
+            fetch('/start_detection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `rtsp_url=${encodeURIComponent(url)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert(data.error);
+                    updateStatus(false);
+                } else {
+                    console.log(data.message);
                 }
-                
-                hls = new Hls();
-                hls.loadSource(url);
-                hls.attachMedia(videoElement);
-                
-                hls.on(Hls.Events.MANIFEST_PARSED, function() {
-                    videoElement.play();
-                    isProcessing = true;
-                    updateStatus(true);
-                    loadingOverlay.style.display = 'none';
-                    
-                    // Start processing frames
-                    processingInterval = setInterval(processFrame, 1000); // Process every second
-                });
-                
-                hls.on(Hls.Events.ERROR, function(event, data) {
-                    console.error('HLS Error:', data);
-                    if (data.fatal) {
-                        alert('Error loading video stream');
-                        updateStatus(false);
-                        loadingOverlay.style.display = 'none';
-                    }
-                });
-            } else if (videoElement.canPlayType('application/vnd.apple.mpegurl')) {
-                videoElement.src = url;
-                videoElement.addEventListener('loadedmetadata', function() {
-                    videoElement.play();
-                    isProcessing = true;
-                    updateStatus(true);
-                    loadingOverlay.style.display = 'none';
-                    
-                    // Start processing frames
-                    processingInterval = setInterval(processFrame, 1000);
-                });
-            } else {
-                alert('Browser Anda tidak mendukung HLS streaming');
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan saat memulai deteksi');
+                updateStatus(false);
+            })
+            .finally(() => {
                 loadingOverlay.style.display = 'none';
-            }
+            });
         });
 
         stopBtn.addEventListener('click', function() {
-            if (hls) {
-                hls.destroy();
-                hls = null;
-            }
+            loadingOverlay.style.display = 'flex';
             
-            if (processingInterval) {
-                clearInterval(processingInterval);
-                processingInterval = null;
-            }
-            
-            isProcessing = false;
-            videoElement.src = '';
-            updateStatus(false);
-            
-            // Reset counters
-            document.getElementById('count-person').textContent = '0';
-            document.getElementById('count-car').textContent = '0';
-            document.getElementById('count-motorcycle').textContent = '0';
-            document.getElementById('count-bicycle').textContent = '0';
-            document.getElementById('count-truck').textContent = '0';
-            document.getElementById('count-bus').textContent = '0';
-            document.getElementById('count-cat').textContent = '0';
-            document.getElementById('count-dog').textContent = '0';
-            document.getElementById('totalObjects').textContent = '0';
+            fetch('/stop_detection', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data.message);
+                updateStatus(false);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Terjadi kesalahan saat menghentikan deteksi');
+            })
+            .finally(() => {
+                loadingOverlay.style.display = 'none';
+            });
         });
 
         // Update status awal
         updateStatus(false);
+
+        // Fungsi untuk memperbarui informasi objek yang terdeteksi
+        function updateDetectedObjects() {
+            fetch('/get_detected_objects')
+                .then(response => response.json())
+                .then(data => {
+                    const objects = data.objects;
+                    const total = data.total;
+                    
+                    // Update jumlah untuk setiap jenis objek
+                    document.getElementById('count-person').textContent = objects['Orang'] || 0;
+                    document.getElementById('count-car').textContent = objects['mobil'] || 0;
+                    document.getElementById('count-motorcycle').textContent = objects['motor'] || 0;
+                    document.getElementById('count-bicycle').textContent = objects['sepeda'] || 0;
+                    document.getElementById('count-truck').textContent = objects['truk'] || 0;
+                    document.getElementById('count-bus').textContent = objects['bus'] || 0;
+                    document.getElementById('count-cat').textContent = objects['Kucing'] || 0;
+                    document.getElementById('count-dog').textContent = objects['Anjing'] || 0;
+                    
+                    // Update total objek
+                    document.getElementById('totalObjects').textContent = total;
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Update informasi objek setiap 1 detik
+        setInterval(updateDetectedObjects, 1000);
+
+        // Fungsi untuk memperbarui grafik statistik
+        function updateStatistics() {
+            fetch('/get_statistics')
+                .then(response => response.json())
+                .then(data => {
+                    Plotly.newPlot('statisticsChart', data.line_graph.data, data.line_graph.layout);
+                    Plotly.newPlot('pieChart', data.pie_graph.data, data.pie_graph.layout);
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Fungsi untuk memperbarui riwayat deteksi
+        function updateHistory() {
+            fetch('/get_detection_history')
+                .then(response => response.json())
+                .then(data => {
+                    const historyContainer = document.getElementById('detectionHistory');
+                    historyContainer.innerHTML = data.map(entry => `
+                        <tr>
+                            <td>${entry.timestamp}</td>
+                            <td>${entry.objects['Orang'] || 0}</td>
+                            <td>${entry.objects['mobil'] || 0}</td>
+                            <td>${entry.objects['motor'] || 0}</td>
+                            <td>${entry.objects['sepeda'] || 0}</td>
+                            <td>${entry.objects['truk'] || 0}</td>
+                            <td>${entry.objects['bus'] || 0}</td>
+                            <td>${entry.objects['Kucing'] || 0}</td>
+                            <td>${entry.objects['Anjing'] || 0}</td>
+                            <td>${entry.total}</td>
+                        </tr>
+                    `).join('');
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Event listener untuk filter objek
+        document.getElementById('objectFilter').addEventListener('change', function(e) {
+            const objectType = e.target.value;
+            if (objectType === 'all') {
+                updateStatistics();
+            } else {
+                fetch('/filter_objects', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ object_type: objectType })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const trace = {
+                        x: Object.keys(data.history),
+                        y: Object.values(data.history),
+                        type: 'scatter',
+                        name: data.object_type
+                    };
+                    const layout = {
+                        title: `Statistik Deteksi - ${data.object_type}`,
+                        xaxis: { title: 'Waktu' },
+                        yaxis: { title: 'Jumlah' }
+                    };
+                    Plotly.newPlot('statisticsChart', [trace], layout);
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        });
+
+        // Event listener untuk export data
+        document.getElementById('exportBtn').addEventListener('click', function() {
+            window.location.href = '/export_data';
+        });
+
+        // Fungsi untuk memperbarui ringkasan objek
+        function updateObjectSummary() {
+            fetch('/get_object_summary')
+                .then(response => response.json())
+                .then(data => {
+                    const summaryContainer = document.getElementById('objectSummary');
+                    const objectTypes = ['Orang', 'mobil', 'motor', 'sepeda', 'truk', 'bus', 'Kucing', 'Anjing'];
+                    
+                    summaryContainer.innerHTML = objectTypes.map(type => `
+                        <tr>
+                            <td>${type}</td>
+                            <td>${data.totals[type] || 0}</td>
+                            <td>${data.percentages[type] || 0}%</td>
+                        </tr>
+                    `).join('');
+                    
+                    document.getElementById('totalAll').textContent = data.total_all;
+
+                    // Update pie chart
+                    const pieData = [{
+                        values: objectTypes.map(type => data.totals[type] || 0),
+                        labels: objectTypes,
+                        type: 'pie',
+                        textinfo: 'label+percent',
+                        insidetextorientation: 'radial'
+                    }];
+
+                    const pieLayout = {
+                        title: 'Persentase Objek Terdeteksi',
+                        showlegend: true,
+                        legend: {
+                            orientation: 'h',
+                            y: -0.1
+                        }
+                    };
+
+                    Plotly.newPlot('summaryPieChart', pieData, pieLayout);
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        // Update ringkasan setiap 10 detik
+        setInterval(() => {
+            updateObjectSummary();
+        }, 10000);
+
+        // Update awal
+        updateObjectSummary();
     </script>
 </body>
 </html> 

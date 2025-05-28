@@ -1,59 +1,107 @@
 # Object Detection CCTV
 
-Aplikasi web untuk deteksi objek real-time menggunakan CCTV feed.
+Aplikasi web untuk deteksi objek real-time menggunakan CCTV feed dengan kemampuan deteksi plat nomor kendaraan.
 
-## Fitur
+## 🚀 Fitur Utama
 
-- Deteksi objek real-time (orang, mobil, motor, sepeda, truk, bus, kucing, anjing)
-- Deteksi plat nomor kendaraan
-- Antarmuka web responsif
-- Update real-time jumlah objek terdeteksi
-- Dukungan untuk stream HLS (m3u8)
+- **Deteksi Objek Real-time**
+  - Deteksi berbagai objek: orang, mobil, motor, sepeda, truk, bus, kucing, anjing
+  - Akurasi tinggi menggunakan model YOLO
+  - Visualisasi bounding box dan label real-time
 
-## Teknologi
+- **Deteksi Plat Nomor**
+  - Ekstraksi plat nomor kendaraan
+  - OCR untuk membaca teks plat nomor
+  - Dukungan format plat nomor Indonesia
 
-- Flask
-- OpenCV
-- YOLOS (You Only Look Once)
-- EasyOCR
-- PyTorch
-- Vercel (Deployment)
+- **Antarmuka Web**
+  - Desain responsif dan modern
+  - Update real-time jumlah objek terdeteksi
+  - Visualisasi statistik deteksi
+  - Dukungan untuk stream HLS (m3u8)
 
-## Cara Menjalankan
+## 🛠️ Teknologi
 
-1. Install dependencies:
+- **Backend**
+  - Flask (Web Framework)
+  - OpenCV (Image Processing)
+  - YOLO (Object Detection)
+  - EasyOCR (Text Recognition)
+  - PyTorch (Deep Learning)
+
+- **Frontend**
+  - HTML5
+  - CSS3
+  - JavaScript
+  - Bootstrap
+
+## 📋 Prasyarat
+
+- Python 3.8+
+- pip (Python package manager)
+- Webcam atau CCTV feed
+- Koneksi internet
+
+## 🚀 Cara Menjalankan
+
+1. Clone repository:
+```bash
+git clone [URL_REPOSITORY]
+cd ObjectDetection
+```
+
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Jalankan aplikasi:
+3. Jalankan aplikasi:
 ```bash
 python app.py
 ```
 
-3. Buka browser dan akses `http://localhost:8080`
+4. Buka browser dan akses `http://localhost:8080`
 
-## Deployment
+## 🚀 Deployment
 
-Aplikasi ini sudah dikonfigurasi untuk deployment di Vercel. Untuk deploy:
+Aplikasi ini dapat di-deploy di berbagai platform hosting Python seperti:
+- Heroku
+- PythonAnywhere
+- DigitalOcean
+- AWS
+- Google Cloud Platform
 
-1. Push kode ke repository GitHub
-2. Import proyek di Vercel
-3. Deploy
+Untuk deployment, pastikan untuk:
+1. Mengatur environment variables yang diperlukan
+2. Mengkonfigurasi web server (seperti Nginx atau Apache)
+3. Menggunakan WSGI server (seperti Gunicorn atau uWSGI)
 
-## Struktur Proyek
+## 📁 Struktur Proyek
 
 ```
 .
 ├── app.py              # Aplikasi Flask utama
-├── wsgi.py            # Entry point untuk Vercel
+├── wsgi.py            # Entry point WSGI
 ├── requirements.txt   # Dependencies
 ├── runtime.txt        # Versi Python
-├── vercel.json        # Konfigurasi Vercel
 └── templates/         # Template HTML
     └── index.html     # Halaman utama
 ```
 
-## Lisensi
+## 🤝 Kontribusi
 
-MIT 
+Kontribusi selalu diterima! Untuk berkontribusi:
+
+1. Fork repository
+2. Buat branch fitur (`git checkout -b fitur-baru`)
+3. Commit perubahan (`git commit -m 'Menambahkan fitur baru'`)
+4. Push ke branch (`git push origin fitur-baru`)
+5. Buat Pull Request
+
+## 📝 Lisensi
+
+Proyek ini dilisensikan di bawah Lisensi MIT - lihat file [LICENSE](LICENSE) untuk detailnya.
+
+## 📞 Kontak
+
+Untuk pertanyaan atau dukungan, silakan buat issue di repository ini. 

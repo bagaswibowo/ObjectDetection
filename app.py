@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, Response, jsonify
+from flask import Flask, render_template, request, Response, jsonify, send_file
 import cv2
 import numpy as np
 from PIL import Image
@@ -8,42 +8,21 @@ import queue
 import easyocr
 from transformers import YolosImageProcessor, YolosForObjectDetection
 import time
-from collections import Counter
+from collections import Counter, defaultdict
 import os
-import logging
-from functools import lru_cache
+import pandas as pd
+from datetime import datetime
+import json
+import plotly
+import plotly.express as px
+from io import BytesIO
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
-# Cache untuk model dan processor
-@lru_cache(maxsize=1)
-def get_model():
-    try:
-        model = YolosForObjectDetection.from_pretrained('hustvl/yolos-tiny')
-        return model
-    except Exception as e:
-        logger.error(f"Error loading model: {str(e)}")
-        raise
-
-@lru_cache(maxsize=1)
-def get_processor():
-    try:
-        processor = YolosImageProcessor.from_pretrained("hustvl/yolos-tiny")
-        return processor
-    except Exception as e:
-        logger.error(f"Error loading processor: {str(e)}")
-        raise
-
-@lru_cache(maxsize=1)
-def get_ocr():
-    try:
-        reader = easyocr.Reader(['id'])
-        return reader
-    except Exception as e:
-        logger.error(f"Error loading OCR: {str(e)}")
-        raise
+# Inisialisasi model dan komponen deteksi
+model = YolosForObjectDetection.from_pretrained('hustvl/yolos-tiny')
+image_processor = YolosImageProcessor.from_pretrained("hustvl/yolos-tiny")
+reader = easyocr.Reader(['id'])
 
 label_translation = {
     'bicycle': 'sepeda',
@@ -64,89 +43,33 @@ detection_thread = None
 stop_detection = False
 detected_objects = Counter()  # Menggunakan Counter untuk menghitung jumlah objek
 
-def process_frame(frame):
-    """Process a single frame for object detection"""
-    try:
-        # Convert frame to PIL Image
-        image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        
-        # Get model and processor
-        model = get_model()
-        processor = get_processor()
-        
-        # Process image
-        inputs = processor(images=image, return_tensors="pt")
-        outputs = model(**inputs)
+# Menyimpan riwayat deteksi per 10 detik
+detection_history = defaultdict(lambda: defaultdict(int))
+last_minute = None
 
-        target_sizes = torch.tensor([image.size[::-1]])
-        results = processor.post_process_object_detection(
-            outputs, threshold=0.8, target_sizes=target_sizes)[0]
+def deteksi_plat(frame, vehicle_area):
+    """Mendeteksi plat nomor kendaraan pada frame yang diberikan."""
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    enhanced_gray = cv2.equalizeHist(gray)
+    edges = cv2.Canny(enhanced_gray, 100, 200)
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        detected_objects = Counter()
-        processed_frame = frame.copy()
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        plate_area = w * h
 
-        for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
-            box = [round(i, 2) for i in box.tolist()]
-            if score > 0.85 and model.config.id2label[label.item()] in ('car', 'motorcycle', 'truck', 'bus', 'person', 'human', 'cat', 'dog'):
-                x1, y1, x2, y2 = map(int, box)
-                vehicle_area = (x2 - x1) * (y2 - y1)
-                
-                # Process vehicle plate if applicable
-                if model.config.id2label[label.item()] in ('car', 'motorcycle', 'truck', 'bus'):
-                    processed_frame = detect_plate(processed_frame, (x1, y1, x2, y2), vehicle_area)
+        if plate_area <= vehicle_area / 10:
+            aspect_ratio = w / h
+            if 2 < aspect_ratio < 5:  # Rasio plat nomor umumnya antara 2:1 hingga 5:1
+                plate_region = frame[y:y+h, x:x+w]
+                result = reader.readtext(plate_region)
 
-                # Add object to counter
-                obj_label = label_translation.get(model.config.id2label[label.item()], label.item())
-                detected_objects[obj_label] += 1
-
-                # Draw bounding box
-                cv2.rectangle(processed_frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                cv2.putText(processed_frame, f"{obj_label}: {round(score.item(), 3)}", 
-                            (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
-
-        return processed_frame, detected_objects
-
-    except Exception as e:
-        logger.error(f"Error processing frame: {str(e)}")
-        return frame, Counter()
-
-def detect_plate(frame, bbox, vehicle_area):
-    """Detect license plate in the given bounding box"""
-    try:
-        x1, y1, x2, y2 = bbox
-        roi = frame[y1:y2, x1:x2]
-        
-        # Convert to grayscale
-        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-        enhanced_gray = cv2.equalizeHist(gray)
-        edges = cv2.Canny(enhanced_gray, 100, 200)
-        
-        # Find contours
-        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # Get OCR reader
-        reader = get_ocr()
-        
-        for contour in contours:
-            x, y, w, h = cv2.boundingRect(contour)
-            plate_area = w * h
-            
-            if plate_area <= vehicle_area / 10:
-                aspect_ratio = w / h
-                if 2 < aspect_ratio < 5:
-                    plate_region = roi[y:y+h, x:x+w]
-                    result = reader.readtext(plate_region)
-                    
-                    if result:
-                        plat_text = " ".join([detection[1] for detection in result])
-                        cv2.rectangle(frame, (x1 + x, y1 + y), (x1 + x + w, y1 + y + h), (0, 255, 0), 2)
-                        cv2.putText(frame, plat_text, (x1 + x, y1 + y - 10), 
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-        
-        return frame
-    except Exception as e:
-        logger.error(f"Error detecting plate: {str(e)}")
-        return frame
+                if result:
+                    plat_text = " ".join([detection[1] for detection in result])
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                    cv2.putText(frame, plat_text, (x, y - 10), 
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+    return frame
 
 def generate_frames():
     while True:
@@ -159,7 +82,7 @@ def generate_frames():
         time.sleep(0.1)  # Tambahkan delay kecil untuk mengurangi beban CPU
 
 def detection_worker(hls_url):
-    global stop_detection, detected_objects
+    global stop_detection, detected_objects, last_minute
     cap = cv2.VideoCapture(hls_url)
     
     if not cap.isOpened():
@@ -170,8 +93,16 @@ def detection_worker(hls_url):
         ret, frame = cap.read()
         if not ret:
             print("Error: Tidak bisa membaca frame.")
-            time.sleep(1)  # Tunggu sebentar sebelum mencoba lagi
+            time.sleep(1)
             continue
+
+        # Update riwayat per 10 detik
+        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        if not last_minute or (datetime.strptime(current_time, '%Y-%m-%d %H:%M:%S') - 
+                             datetime.strptime(last_minute, '%Y-%m-%d %H:%M:%S')).total_seconds() >= 10:
+            for obj, count in detected_objects.items():
+                detection_history[current_time][obj] = count
+            last_minute = current_time
 
         # Ubah frame ke format PIL Image
         image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
@@ -194,7 +125,7 @@ def detection_worker(hls_url):
 
                 # Deteksi plat nomor untuk kendaraan
                 if model.config.id2label[label.item()] in ('car', 'motorcycle', 'truck', 'bus'):
-                    cropped_frame = detect_plate(cropped_frame, (x1, y1, x2, y2), vehicle_area)
+                    cropped_frame = deteksi_plat(cropped_frame, vehicle_area)
 
                 # Tambahkan objek ke Counter
                 obj_label = label_translation.get(model.config.id2label[label.item()], label.item())
@@ -254,40 +185,110 @@ def get_detected_objects():
         'total': sum(detected_objects.values())
     })
 
-@app.route('/process_frame', methods=['POST'])
-def process_frame_route():
-    try:
-        if 'frame' not in request.files:
-            return jsonify({'error': 'No frame provided'}), 400
-            
-        # Read frame from request
-        frame_file = request.files['frame']
-        frame_array = np.frombuffer(frame_file.read(), np.uint8)
-        frame = cv2.imdecode(frame_array, cv2.IMREAD_COLOR)
-        
-        if frame is None:
-            return jsonify({'error': 'Invalid frame data'}), 400
-            
-        # Process frame
-        processed_frame, detected_objects = process_frame(frame)
-        
-        # Encode processed frame
-        _, buffer = cv2.imencode('.jpg', processed_frame)
-        processed_frame_bytes = buffer.tobytes()
-        
-        return jsonify({
-            'frame': processed_frame_bytes.decode('latin1'),
-            'objects': dict(detected_objects),
-            'total': sum(detected_objects.values())
+@app.route('/get_detection_history')
+def get_detection_history():
+    times = list(detection_history.keys())
+    data = []
+    
+    for time in times:
+        time_data = detection_history[time]
+        total = sum(time_data.values())
+        data.append({
+            'timestamp': time,
+            'objects': dict(time_data),
+            'total': total
         })
-        
-    except Exception as e:
-        logger.error(f"Error in process_frame_route: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+    
+    return jsonify(data)
 
-@app.route('/health')
-def health_check():
-    return jsonify({'status': 'healthy'})
+@app.route('/get_statistics')
+def get_statistics():
+    # Buat DataFrame dari riwayat deteksi
+    df = pd.DataFrame.from_dict(detection_history, orient='index')
+    
+    # Hitung total untuk setiap objek
+    total_counts = df.sum()
+    
+    # Buat grafik line menggunakan Plotly
+    fig_line = px.line(df, title='Statistik Deteksi per 10 Detik')
+    fig_line.update_layout(
+        xaxis_title='Waktu',
+        yaxis_title='Jumlah Objek',
+        legend_title='Jenis Objek'
+    )
+    
+    # Buat grafik pie untuk persentase
+    fig_pie = px.pie(
+        values=total_counts.values,
+        names=total_counts.index,
+        title='Persentase Objek Terdeteksi'
+    )
+    
+    return jsonify({
+        'line_graph': json.loads(fig_line.to_json()),
+        'pie_graph': json.loads(fig_pie.to_json()),
+        'total_counts': total_counts.to_dict()
+    })
+
+@app.route('/export_data')
+def export_data():
+    # Buat DataFrame dari riwayat deteksi
+    df = pd.DataFrame.from_dict(detection_history, orient='index')
+    
+    # Buat file Excel di memori
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Deteksi')
+    
+    output.seek(0)
+    
+    # Kirim file
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'detection_history_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx'
+    )
+
+@app.route('/filter_objects', methods=['POST'])
+def filter_objects():
+    data = request.get_json()
+    object_type = data.get('object_type')
+    
+    if not object_type:
+        return jsonify({'error': 'Jenis objek tidak ditentukan'}), 400
+    
+    # Filter riwayat berdasarkan jenis objek
+    filtered_history = {
+        minute: counts.get(object_type, 0)
+        for minute, counts in detection_history.items()
+    }
+    
+    return jsonify({
+        'object_type': object_type,
+        'history': filtered_history
+    })
+
+@app.route('/get_object_summary')
+def get_object_summary():
+    # Buat DataFrame dari riwayat deteksi
+    df = pd.DataFrame.from_dict(detection_history, orient='index')
+    
+    # Hitung total untuk setiap objek
+    total_counts = df.sum()
+    total_all = total_counts.sum()
+    
+    # Hitung persentase untuk setiap objek
+    percentages = (total_counts / total_all * 100).round(2)
+    
+    # Buat dictionary untuk response
+    summary = {
+        'totals': total_counts.to_dict(),
+        'percentages': percentages.to_dict(),
+        'total_all': int(total_all)
+    }
+    
+    return jsonify(summary)
 
 # Untuk Vercel
 if __name__ == '__main__':

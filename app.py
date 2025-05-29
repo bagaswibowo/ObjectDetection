@@ -42,11 +42,12 @@ label_translation = {
 }
 
 # Queue untuk menyimpan frame
-frame_queue = queue.Queue(maxsize=2)
+frame_queue = None
 current_stream_url = None
 detection_thread = None
 stop_detection = False
-detected_objects = Counter()  # Menggunakan Counter untuk menghitung jumlah objek
+detected_objects = None
+detection_history = None
 
 # Menyimpan riwayat deteksi per 10 detik
 detection_history = defaultdict(lambda: defaultdict(int))
@@ -286,7 +287,20 @@ def get_object_summary():
 @app.route('/health')
 def health_check():
     logger.info("Health check endpoint called")
-    return jsonify({"status": "healthy"}), 200
+    return jsonify({"status": "healthy", "message": "Service is running"}), 200
+
+# Import dan inisialisasi komponen lain setelah aplikasi start
+def initialize_components():
+    global frame_queue, detected_objects, detection_history
+    import queue
+    from collections import Counter, defaultdict
+    
+    frame_queue = queue.Queue(maxsize=2)
+    detected_objects = Counter()
+    detection_history = defaultdict(lambda: defaultdict(int))
+
+# Inisialisasi komponen saat aplikasi start
+initialize_components()
 
 # Untuk Vercel
 if __name__ == '__main__':

@@ -278,6 +278,10 @@ def get_object_summary():
     
     return jsonify(summary)
 
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
 # Untuk Vercel
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))

@@ -64,44 +64,8 @@ python app.py
 
 ## 🚀 Deployment
 
-Aplikasi ini dapat di-deploy di berbagai platform hosting Python seperti:
-- Heroku
-- PythonAnywhere
-- DigitalOcean
-- AWS
-- Google Cloud Platform
-
-Untuk deployment, pastikan untuk:
-1. Mengatur environment variables yang diperlukan
-2. Mengkonfigurasi web server (seperti Nginx atau Apache)
-3. Menggunakan WSGI server (seperti Gunicorn atau uWSGI)
+Aplikasi ini di-deploy menggunakan GitHub Actions ke Azure Web App. Setiap push ke branch `main` akan memicu proses deployment otomatis.
 
 ## 📁 Struktur Proyek
 
 ```
-.
-├── app.py              # Aplikasi Flask utama
-├── wsgi.py            # Entry point WSGI
-├── requirements.txt   # Dependencies
-├── runtime.txt        # Versi Python
-└── templates/         # Template HTML
-    └── index.html     # Halaman utama
-```
-
-## 🤝 Kontribusi
-
-Kontribusi selalu diterima! Untuk berkontribusi:
-
-1. Fork repository
-2. Buat branch fitur (`git checkout -b fitur-baru`)
-3. Commit perubahan (`git commit -m 'Menambahkan fitur baru'`)
-4. Push ke branch (`git push origin fitur-baru`)
-5. Buat Pull Request
-
-## 📝 Lisensi
-
-Proyek ini dilisensikan di bawah Lisensi MIT - lihat file [LICENSE](LICENSE) untuk detailnya.
-
-## 📞 Kontak
-
-Untuk pertanyaan atau dukungan, silakan buat issue di repository ini. 

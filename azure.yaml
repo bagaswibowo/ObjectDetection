@@ -1,0 +1,4 @@
+name: object-detection-app
+language: python
+pythonVersion: '3.9'
+startupCommand: gunicorn --bind=0.0.0.0 --timeout 600 wsgi:app 

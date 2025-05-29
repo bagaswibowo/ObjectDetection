@@ -16,6 +16,11 @@ import json
 import plotly
 import plotly.express as px
 from io import BytesIO
+import logging
+
+# Konfigurasi logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -280,6 +285,7 @@ def get_object_summary():
 
 @app.route('/health')
 def health_check():
+    logger.info("Health check endpoint called")
     return jsonify({"status": "healthy"}), 200
 
 # Untuk Vercel

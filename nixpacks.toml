@@ -1,10 +1,11 @@
 [phases.setup]
-nixPkgs = ["python39", "gcc", "pkg-config"]
+nixPkgs = ["python39", "gcc", "pkg-config", "libjpeg", "zlib"]
 
 [phases.install]
 cmds = [
     "python -m venv /opt/venv",
     ". /opt/venv/bin/activate",
+    "pip install --upgrade pip",
     "pip install -r requirements.txt"
 ]
 

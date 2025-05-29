@@ -163,6 +163,24 @@
         </div>
 
         <div class="stats-container">
+            <h4><i class="fas fa-chart-line"></i> Statistik Deteksi</h4>
+            <div class="filter-container">
+                <select class="form-select" id="objectFilter" aria-label="Filter objek">
+                    <option value="all">Semua Objek</option>
+                    <option value="Orang">Orang</option>
+                    <option value="mobil">Mobil</option>
+                    <option value="motor">Motor</option>
+                    <option value="sepeda">Sepeda</option>
+                    <option value="truk">Truk</option>
+                    <option value="bus">Bus</option>
+                    <option value="Kucing">Kucing</option>
+                    <option value="Anjing">Anjing</option>
+                </select>
+            </div>
+            <div id="statisticsChart"></div>
+        </div>
+
+        <div class="stats-container">
             <h4><i class="fas fa-chart-pie"></i> Ringkasan Objek Terdeteksi</h4>
             <div class="row">
                 <div class="col-md-6">
@@ -189,31 +207,6 @@
                 </div>
                 <div class="col-md-6">
                     <div id="summaryPieChart"></div>
-                </div>
-            </div>
-        </div>
-
-        <div class="stats-container">
-            <h4><i class="fas fa-chart-line"></i> Statistik Deteksi</h4>
-            <div class="filter-container">
-                <select class="form-select" id="objectFilter" aria-label="Filter objek">
-                    <option value="all">Semua Objek</option>
-                    <option value="Orang">Orang</option>
-                    <option value="mobil">Mobil</option>
-                    <option value="motor">Motor</option>
-                    <option value="sepeda">Sepeda</option>
-                    <option value="truk">Truk</option>
-                    <option value="bus">Bus</option>
-                    <option value="Kucing">Kucing</option>
-                    <option value="Anjing">Anjing</option>
-                </select>
-            </div>
-            <div class="row">
-                <div class="col-md-8">
-                    <div id="statisticsChart"></div>
-                </div>
-                <div class="col-md-4">
-                    <div id="pieChart"></div>
                 </div>
             </div>
         </div>
@@ -358,7 +351,6 @@
                 .then(response => response.json())
                 .then(data => {
                     Plotly.newPlot('statisticsChart', data.line_graph.data, data.line_graph.layout);
-                    Plotly.newPlot('pieChart', data.pie_graph.data, data.pie_graph.layout);
                 })
                 .catch(error => console.error('Error:', error));
         }
@@ -465,12 +457,16 @@
                 .catch(error => console.error('Error:', error));
         }
 
-        // Update ringkasan setiap 10 detik
+        // Update statistik dan riwayat setiap 10 detik
         setInterval(() => {
+            updateStatistics();
+            updateHistory();
             updateObjectSummary();
         }, 10000);
 
         // Update awal
+        updateStatistics();
+        updateHistory();
         updateObjectSummary();
     </script>
 </body>

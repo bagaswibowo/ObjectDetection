@@ -206,9 +206,6 @@ def get_statistics():
     # Buat DataFrame dari riwayat deteksi
     df = pd.DataFrame.from_dict(detection_history, orient='index')
     
-    # Hitung total untuk setiap objek
-    total_counts = df.sum()
-    
     # Buat grafik line menggunakan Plotly
     fig_line = px.line(df, title='Statistik Deteksi per 10 Detik')
     fig_line.update_layout(
@@ -217,17 +214,8 @@ def get_statistics():
         legend_title='Jenis Objek'
     )
     
-    # Buat grafik pie untuk persentase
-    fig_pie = px.pie(
-        values=total_counts.values,
-        names=total_counts.index,
-        title='Persentase Objek Terdeteksi'
-    )
-    
     return jsonify({
-        'line_graph': json.loads(fig_line.to_json()),
-        'pie_graph': json.loads(fig_pie.to_json()),
-        'total_counts': total_counts.to_dict()
+        'line_graph': json.loads(fig_line.to_json())
     })
 
 @app.route('/export_data')

@@ -1,0 +1,34 @@
+name: Deploy Python Flask App to Azure Web App
+
+on:
+  push:
+    branches:
+      - main  # Ganti ke 'master' jika itu branch utama Anda
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production # Opsional: jika Anda memiliki environment 'production' di GitHub
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python version
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.9' # Sesuai dengan runtime.txt Anda
+
+    - name: Install dependencies
+      run: |
+        python -m venv antenv
+        source antenv/bin/activate
+        pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: 'ObjectDetectionAPP' # Nama App Service Anda
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }} # Rahasia yang Anda buat
+        package: '.' # Deploy dari direktori root proyek

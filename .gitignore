@@ -51,4 +51,12 @@ Thumbs.db
 *.pt
 *.pth
 *.onnx
-*.bin 
+*.bin
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+.docker/
+
+# Logs directory
+logs/

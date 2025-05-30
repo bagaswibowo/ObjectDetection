@@ -160,117 +160,107 @@ sudo systemctl enable objectdetection
 sudo systemctl start objectdetection
 ```
 
-## 📁 Struktur Proyek
+### 🐳 Docker Deployment (Direkomendasikan)
 
-```
-ObjectDetection/
-├── app.py                 # Aplikasi Flask utama
-├── wsgi.py               # Entry point untuk Gunicorn
-├── requirements.txt      # Dependencies Python
-├── runtime.txt          # Runtime Python untuk Azure
-├── README.md            # Dokumentasi proyek
-├── .gitignore          # Git ignore rules
-├── templates/          # Template HTML
-│   └── index.html      # Template utama
-├── .github/
-│   └── workflows/
-│       └── main.yml    # GitHub Actions untuk Azure App Service
-└── static/             # File statis (jika ada)
-    ├── css/
-    ├── js/
-    └── images/
-```
+Docker menyediakan cara yang konsisten dan mudah untuk men-deploy aplikasi di berbagai environment.
 
-## 🔧 Konfigurasi
+**Keuntungan Docker:**
+- Konsistensi environment di semua platform
+- Isolasi dependencies dan sistem
+- Mudah untuk scaling dan maintenance
+- Tidak perlu setup manual dependencies sistem
 
-### Environment Variables (Opsional)
+#### Quick Start dengan Docker
+
+1. **Install Docker:**
 ```bash
-# Untuk production
-export FLASK_ENV=production
-export FLASK_DEBUG=False
+# macOS (dengan Homebrew)
+brew install docker docker-compose
 
-# Untuk development
-export FLASK_ENV=development
-export FLASK_DEBUG=True
+# Ubuntu/Debian
+sudo apt install docker.io docker-compose
+
+# Atau install Docker Desktop dari docker.com
 ```
 
-### Model Configuration
-- Model: `hustvl/yolos-tiny` dari Hugging Face
-- Model akan didownload otomatis saat pertama kali dijalankan
-- Cache model tersimpan di `~/.cache/huggingface/`
-
-## 🧪 Testing
-
-### Test Lokal
+2. **Build dan Jalankan:**
 ```bash
-# Test import dependencies
-python3 -c "import cv2, torch, transformers; print('All dependencies OK')"
+# Clone repository
+git clone https://github.com/username/ObjectDetection.git
+cd ObjectDetection
 
-# Test aplikasi
-curl http://localhost:5000/health
+# Build dan jalankan dengan Docker Compose
+docker-compose up --build
+
+# Atau jalankan di background
+docker-compose up -d --build
 ```
 
-### Troubleshooting Common Issues
+3. **Akses Aplikasi:**
+```
+http://localhost:8000
+```
 
-1. **ImportError: libGL.so.1**
-   ```bash
-   # Ubuntu/Debian
-   sudo apt install libgl1-mesa-glx libglib2.0-0
-   
-   # CentOS/RHEL
-   sudo yum install mesa-libGL glib2
-   ```
+#### Perintah Docker Berguna
 
-2. **ModuleNotFoundError: cv2**
-   ```bash
-   pip install opencv-python-headless==4.5.5.64
-   ```
+```bash
+# Lihat status container
+docker-compose ps
 
-3. **ImportError: YolosImageProcessor**
-   ```bash
-   pip install transformers>=4.19.2
-   ```
+# Lihat logs
+docker-compose logs -f
 
-4. **Memory Issues**
-   - Pastikan minimal 4GB RAM tersedia
-   - Reduce worker count di Gunicorn
-   - Gunakan swap jika diperlukan
+# Stop aplikasi
+docker-compose down
 
-## 📊 Performance
+# Update aplikasi (rebuild image)
+git pull
+docker-compose down
+docker-compose up --build -d
 
-- **Model Load Time**: ~10-30 detik (pertama kali)
-- **Detection Latency**: ~100-500ms per frame
-- **Memory Usage**: ~2-4GB (tergantung ukuran batch)
-- **Throughput**: ~2-10 FPS (tergantung hardware)
+# Masuk ke container untuk debugging
+docker-compose exec objectdetection bash
 
-## 🔒 Security
+# Cleanup (hapus container, image, dan volume)
+docker-compose down --rmi all --volumes
+```
 
-- Aplikasi tidak menyimpan video atau gambar secara permanen
-- Model berjalan offline setelah download pertama
-- Gunakan HTTPS di production
-- Implementasikan rate limiting jika diperlukan
+#### Build Manual (tanpa Docker Compose)
 
-## 🤝 Contributing
+```bash
+# Build image
+docker build -t objectdetection-app .
 
-1. Fork repository
-2. Buat feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit perubahan (`git commit -m 'Add some AmazingFeature'`)
-4. Push ke branch (`git push origin feature/AmazingFeature`)
-5. Buat Pull Request
+# Jalankan container
+docker run -d \
+  --name objectdetection \
+  -p 8000:8000 \
+  --restart unless-stopped \
+  objectdetection-app
 
-## 📝 License
+# Lihat logs
+docker logs -f objectdetection
+```
 
-Distributed under the MIT License. See `LICENSE` for more information.
+#### Production dengan Docker
 
-## 📞 Contact
+Untuk production, Anda bisa menggunakan:
 
-- Project Link: [https://github.com/username/ObjectDetection](https://github.com/username/ObjectDetection)
-- Issues: [https://github.com/username/ObjectDetection/issues](https://github.com/username/ObjectDetection/issues)
+1. **Docker Swarm:**
+```bash
+docker swarm init
+docker stack deploy -c docker-compose.yml objectdetection
+```
 
-## 🙏 Acknowledgments
+2. **Kubernetes:**
+```bash
+# Convert docker-compose ke Kubernetes manifests
+kompose convert
+kubectl apply -f .
+```
 
-- [Hugging Face](https://huggingface.co/) untuk model YOLOS
-- [OpenCV](https://opencv.org/) untuk computer vision
-- [Flask](https://flask.palletsprojects.com/) untuk web framework
-- [PyTorch](https://pytorch.org/) untuk deep learning
-- [EasyOCR](https://github.com/JaidedAI/EasyOCR) untuk text recognition
+3. **Cloud Container Services:**
+   - Azure Container Instances (ACI)
+   - AWS ECS/Fargate
+   - Google Cloud Run
+````

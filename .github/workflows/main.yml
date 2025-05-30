@@ -29,6 +29,6 @@ jobs:
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2
       with:
-        app-name: 'ObjectDetectionAPP' # Nama App Service Anda
+        app-name: 'ObjectDetectionAPP39' # Nama App Service Anda
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }} # Rahasia yang Anda buat
         package: '.' # Deploy dari direktori root proyek

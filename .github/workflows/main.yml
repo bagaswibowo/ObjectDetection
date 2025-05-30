@@ -19,12 +19,21 @@ jobs:
       with:
         python-version: '3.9' # Sesuai dengan runtime.txt Anda
 
+    - name: Display content of requirements.txt before install
+      run: |
+        echo "--- Content of requirements.txt before install ---"
+        cat requirements.txt
+        echo "--- End of requirements.txt content ---"
+
     - name: Install dependencies
       run: |
         python -m venv antenv
         source antenv/bin/activate
         pip install --upgrade pip
         pip install -r requirements.txt
+        echo "--- Installed packages in GitHub Runner (pip freeze) ---"
+        pip freeze
+        echo "--- End of installed packages ---"
 
     - name: Deploy to Azure Web App
       uses: azure/webapps-deploy@v2

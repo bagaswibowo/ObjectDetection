@@ -6,7 +6,7 @@ import torch
 import threading
 import queue
 import easyocr
-from ultralytics import YOLO
+from transformers import YolosImageProcessor, YolosForObjectDetection
 import time
 from collections import Counter, defaultdict
 import os
@@ -25,26 +25,30 @@ logger = logging.getLogger(__name__)
 # Set environment variables to prevent Git issues
 os.environ['GIT_PYTHON_REFRESH'] = 'quiet'
 
+# URL default untuk CCTV Malioboro
+DEFAULT_CCTV_URL = "https://cctvjss.jogjakota.go.id/malioboro/NolKm_Timur.stream/chunklist_w1981557814.m3u8"
+
 app = Flask(__name__)
 
 # Inisialisasi model dan komponen deteksi
 def initialize_models():
-    """Initialize YOLO model and EasyOCR reader with error handling."""
+    """Initialize YOLOS model and EasyOCR reader with error handling."""
     try:
-        logger.info("Initializing YOLO model...")
-        model = YOLO('yolov8n.pt')  # YOLOv8 nano model
-        logger.info("YOLO model initialized successfully")
+        logger.info("Initializing YOLOS model...")
+        model = YolosForObjectDetection.from_pretrained('hustvl/yolos-tiny')
+        image_processor = YolosImageProcessor.from_pretrained("hustvl/yolos-tiny")
+        logger.info("YOLOS model initialized successfully")
         
         logger.info("Initializing EasyOCR reader...")
         reader = easyocr.Reader(['id'])
         logger.info("EasyOCR reader initialized successfully")
         
-        return model, reader
+        return model, image_processor, reader
     except Exception as e:
         logger.error(f"Error initializing models: {e}")
         raise
 
-model, reader = initialize_models()
+model, image_processor, reader = initialize_models()
 
 label_translation = {
     'bicycle': 'sepeda',
@@ -126,39 +130,34 @@ def detection_worker(hls_url):
 
         # Ubah frame ke format PIL Image
         image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-        
-        # Run YOLOv8 inference
-        results = model(image, conf=0.5)
-        
+        inputs = image_processor(images=image, return_tensors="pt")
+        outputs = model(**inputs)
+
+        target_sizes = torch.tensor([image.size[::-1]])
+        results = image_processor.post_process_object_detection(
+            outputs, threshold=0.8, target_sizes=target_sizes)[0]
+
         # Reset detected objects setiap frame
         detected_objects.clear()
 
-        # Process results
-        for result in results:
-            boxes = result.boxes
-            if boxes is not None:
-                for box in boxes:
-                    # Get box coordinates
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    confidence = float(box.conf[0])
-                    class_id = int(box.cls[0])
-                    class_name = model.names[class_id]
-                    
-                    if confidence > 0.5 and class_name in ('car', 'motorcycle', 'truck', 'bus', 'person', 'cat', 'dog'):
-                        vehicle_area = (x2 - x1) * (y2 - y1)
-                        cropped_frame = frame[y1:y2, x1:x2]
+        for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
+            box = [round(i, 2) for i in box.tolist()]
+            if score > 0.85 and model.config.id2label[label.item()] in ('car', 'motorcycle', 'truck', 'bus', 'person', 'human', 'cat', 'dog'):
+                x1, y1, x2, y2 = map(int, box)
+                vehicle_area = (x2 - x1) * (y2 - y1)
+                cropped_frame = frame[y1:y2, x1:x2]
 
-                        # Deteksi plat nomor untuk kendaraan
-                        if class_name in ('car', 'motorcycle', 'truck', 'bus'):
-                            cropped_frame = deteksi_plat(cropped_frame, vehicle_area)
+                # Deteksi plat nomor untuk kendaraan
+                if model.config.id2label[label.item()] in ('car', 'motorcycle', 'truck', 'bus'):
+                    cropped_frame = deteksi_plat(cropped_frame, vehicle_area)
 
-                        # Tambahkan objek ke Counter
-                        obj_label = label_translation.get(class_name, class_name)
-                        detected_objects[obj_label] += 1
+                # Tambahkan objek ke Counter
+                obj_label = label_translation.get(model.config.id2label[label.item()], model.config.id2label[label.item()])
+                detected_objects[obj_label] += 1
 
-                        cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                        cv2.putText(frame, f"{obj_label}: {confidence:.3f}", 
-                                    (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                cv2.putText(frame, f"{obj_label}: {round(score.item(), 3)}", 
+                            (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 0, 0), 2)
 
         if not frame_queue.full():
             frame_queue.put(frame)
@@ -167,15 +166,15 @@ def detection_worker(hls_url):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', default_url=DEFAULT_CCTV_URL)
 
 @app.route('/start_detection', methods=['POST'])
 def start_detection():
     global current_stream_url, detection_thread, stop_detection
     
-    hls_url = request.form.get('rtsp_url')
+    hls_url = request.form.get('rtsp_url', DEFAULT_CCTV_URL)
     if not hls_url:
-        return jsonify({'error': 'URL stream tidak ditemukan'}), 400
+        hls_url = DEFAULT_CCTV_URL
 
     # Stop deteksi sebelumnya jika ada
     if detection_thread and detection_thread.is_alive():

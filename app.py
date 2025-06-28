@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 os.environ['GIT_PYTHON_REFRESH'] = 'quiet'
 
 # URL default untuk CCTV Malioboro
-DEFAULT_CCTV_URL = "https://cctvjss.jogjakota.go.id/malioboro/NolKm_Timur.stream/chunklist_w1981557814.m3u8"
+DEFAULT_CCTV_URL = "https://example.com/stream.m3u8"
 
 app = Flask(__name__)
 
@@ -322,5 +322,5 @@ initialize_components()
 
 # Untuk Vercel
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port) 
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
